@@ -1,0 +1,18 @@
+meta {
+  name: chat-postventa
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "user_id": "cliente_2",
+    "texto": "Hola, mi pedido 1234 de ayer llegó con un producto faltante."
+  }
+}

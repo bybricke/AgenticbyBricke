@@ -1,0 +1,18 @@
+meta {
+  name: chat-generica
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{BASE_URL}}/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "user_id": "cliente_3",
+    "texto": "¿A qué hora juega la selección nacional?"
+  }
+}

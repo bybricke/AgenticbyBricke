@@ -1,0 +1,18 @@
+meta {
+  name: chat-preventa
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BASE_URL}}/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "user_id": "cliente_1",
+    "texto": "¿Tienen zapatillas deportivas de mujer talla 38?"
+  }
+}

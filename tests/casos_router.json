@@ -1,0 +1,62 @@
+[
+  {
+    "mensaje": "¿tienen la polera azul en talla M?",
+    "esperado": "preventa"
+  },
+  {
+    "mensaje": "quiero comprar dos pares de calcetines",
+    "esperado": "preventa"
+  },
+  {
+    "mensaje": "¿aceptan tarjetas de crédito?",
+    "esperado": "preventa"
+  },
+  {
+    "mensaje": "qué caro, ¿hay descuento?",
+    "esperado": "preventa"
+  },
+  {
+    "mensaje": "¿hasta cuándo dura la promoción de verano?",
+    "esperado": "preventa"
+  },
+  {
+    "mensaje": "mi pedido 4521 llegó roto",
+    "esperado": "postventa"
+  },
+  {
+    "mensaje": "¿cuándo llega lo que compré ayer?",
+    "esperado": "postventa"
+  },
+  {
+    "mensaje": "quiero devolver unas zapatillas",
+    "esperado": "postventa"
+  },
+  {
+    "mensaje": "tengo un problema con una polera",
+    "esperado": "postventa"
+  },
+  {
+    "mensaje": "las botas que recibí no son de mi talla, quiero cambiarlas",
+    "esperado": "postventa"
+  },
+  {
+    "mensaje": "hola",
+    "esperado": "generica"
+  },
+  {
+    "mensaje": "buenas tardes",
+    "esperado": "generica"
+  },
+  {
+    "mensaje": "¿qué hora es en Tokio?",
+    "esperado": "generica"
+  },
+  {
+    "mensaje": "jajaja qué buen chiste",
+    "esperado": "generica"
+  },
+  {
+    "mensaje": "¿va a llover hoy?",
+    "esperado": "generica"
+  }
+]
