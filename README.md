@@ -46,9 +46,14 @@ uvicorn api.app:app --reload --port 8000
 - **Swagger (Documentación interactiva):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 *(Opcional) Probar Telegram en local:*
-Puedes usar `cloudflared` para exponer tu puerto local al mundo de manera segura y usar esa URL como tu `PUBLIC_URL` para Telegram:
+Puedes usar `ngrok` para exponer tu puerto local al mundo de manera segura (no usa protección anti-bots como Cloudflare, que bloquea a Telegram) y usar esa URL como tu `PUBLIC_URL` para Telegram:
 ```bash
-cloudflared tunnel --url http://localhost:8000
+# Si tienes Mac con Homebrew:
+brew install ngrok/ngrok/ngrok
+ngrok http 8000
+
+# Si no tienes Homebrew, descarga el zip desde ngrok.com y ejecuta:
+./ngrok http 8000
 ```
 
 ## Pruebas
