@@ -1,6 +1,7 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException, Request
+import httpx
+from fastapi import FastAPI, HTTPException, Request, Header, BackgroundTasks
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -113,15 +114,68 @@ def chat_endpoint(request: ChatRequest):
         )
 
 
+async def procesar_mensaje_telegram(chat_id: int, texto: str):
+    """
+    Invoca el grafo y envía la respuesta a Telegram.
+    Se ejecuta en background para no bloquear la respuesta a Telegram.
+    """
+    try:
+        initial_state = {
+            "mensaje": texto,
+            "messages": [("user", texto)]
+        }
+        # El thread_id es el chat_id de Telegram para mantener la memoria por usuario
+        config = {"configurable": {"thread_id": str(chat_id)}}
+        
+        result = graph.invoke(initial_state, config=config)
+        respuesta = result.get("respuesta", "Lo siento, tuve un problema procesando tu mensaje.")
+        ruta = result.get("ruta", "desconocida")
+        logger.info(f"Telegram Enrutado -> Chat: {chat_id} | Ruta: {ruta} | Mensaje: {texto[:20]}")
+
+        # Enviar de vuelta a Telegram usando httpx
+        token = os.getenv("TELEGRAM_TOKEN")
+        if token:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {
+                "chat_id": chat_id,
+                "text": respuesta
+            }
+            async with httpx.AsyncClient() as client:
+                await client.post(url, json=payload)
+    except Exception as e:
+        logger.error(f"Error procesando mensaje en background para Telegram: {e}")
+
+
 @app.post("/telegram", include_in_schema=False)
-async def telegram_webhook(request: Request):
+async def telegram_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_telegram_bot_api_secret_token: str = Header(None)
+):
     """
     Webhook destinado a Telegram. Se omite de la documentación de Swagger.
     """
+    # 1. Validar el secret token de Telegram
+    secret = os.getenv("TELEGRAM_SECRET")
+    if not secret or x_telegram_bot_api_secret_token != secret:
+        raise HTTPException(status_code=403, detail="Forbidden: Token inválido.")
+
     try:
-        # Por ahora solo consumimos el body
-        _ = await request.json()
-    except Exception:
-        pass
+        # 2. Leer el update de Telegram
+        data = await request.json()
+        message = data.get("message", {})
+        
+        chat_id = message.get("chat", {}).get("id")
+        texto = message.get("text")
+
+        # 3. Ignorar updates que no contengan texto (fotos, audios, etc. por ahora)
+        if chat_id and texto:
+            # Enviar el procesamiento a una tarea de fondo (Background Task)
+            # Esto permite devolver un 200 OK inmediatamente a Telegram
+            background_tasks.add_task(procesar_mensaje_telegram, chat_id, texto)
+            
+    except Exception as e:
+        logger.error(f"Error parseando request de Telegram: {e}")
     
+    # 4. Responder 200 OK rápido
     return {"ok": True}

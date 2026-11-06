@@ -6,7 +6,7 @@ Este es un proyecto de enrutamiento basado en **LangGraph** y **FastAPI**, dise�
 
 - Python 3.12 (ver archivo `.python-version`)
 - Una clave de API de Google (Gemini)
-- (Opcional) Token de un bot de Telegram proporcionado por BotFather.
+- Token de un bot de Telegram proporcionado por BotFather.
 
 ## Instalación
 
@@ -22,9 +22,6 @@ Este es un proyecto de enrutamiento basado en **LangGraph** y **FastAPI**, dise�
    ```
 4. Configura tus variables de entorno:
    Copia el archivo `.env.example` como `.env` y rellena tus claves.
-   ```bash
-   cp .env.example .env
-   ```
 
 ## Ejecución Local del Router (CLI)
 
@@ -38,10 +35,6 @@ Puedes probar el modelo router desde la consola directamente sin levantar la API
   ```bash
   python main.py router "mi pedido 4521 llegó roto" --saltos
   ```
-- Para ver la arquitectura del grafo en formato Mermaid (`--diagrama`):
-  ```bash
-  python main.py router --diagrama
-  ```
 
 ## Levantar la API Localmente
 
@@ -50,51 +43,59 @@ Para iniciar la API en FastAPI con recarga automática para desarrollo:
 ```bash
 uvicorn api.app:app --reload --port 8000
 ```
-
 - **Swagger (Documentación interactiva):** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check:** `curl http://localhost:8000/health`
-- **Simular un Chat:**
-  ```bash
-  curl -X POST http://localhost:8000/chat \
-    -H "Content-Type: application/json" \
-    -d '{"user_id": "cliente_1", "texto": "¿tienen la polera azul en talla M?"}'
-  ```
 
-## Pruebas
-
-El proyecto cuenta con suites de test para asegurar la precisión del enrutador.
-Para correr las pruebas parametrizadas utilizando `pytest`:
-
+*(Opcional) Probar Telegram en local:*
+Puedes usar `cloudflared` para exponer tu puerto local al mundo de manera segura y usar esa URL como tu `PUBLIC_URL` para Telegram:
 ```bash
-pytest tests/
+cloudflared tunnel --url http://localhost:8000
 ```
 
-Para ver la tabla visual de aciertos, corre el script de prueba:
+## Pruebas
+Para correr las pruebas de enrutamiento (`pytest` y test visual):
 ```bash
+pytest tests/
 python scripts/test_router.py
 ```
 
-## Despliegue en Heroku
+---
 
-El proyecto ya contiene un archivo `Procfile` y la versión de python especificada (`.python-version`).
+## Conectar la API a Telegram y Desplegar (Fly.io / Heroku)
 
-1. Crea tu aplicación en Heroku y configura las variables de entorno en "Settings > Config Vars" (las mismas del archivo `.env`).
-2. Sube los cambios al repositorio y conéctalo con Heroku, o empuja tu rama principal con:
+Sigue estos pasos en orden para levantar tu bot conectándolo con Telegram:
+
+1. **Configura los secretos en tu proveedor de nube (Fly.io o Heroku):**
+   *(Ejemplo para Fly.io, si usas Heroku usa `heroku config:set`)*:
    ```bash
-   git push heroku main
+   fly secrets set TELEGRAM_TOKEN="tu_token_aqui" TELEGRAM_SECRET="cambiame" GOOGLE_API_KEY="tu_google_key"
    ```
 
-## Conectar a Telegram
-
-Una vez desplegada tu aplicación (y teniendo tu URL pública, p.ej. `https://tu-app.herokuapp.com`):
-
-1. En Heroku, asegúrate de que estén configurados:
-   - `TELEGRAM_TOKEN`
-   - `TELEGRAM_SECRET`
-2. Registra el Webhook en Telegram disparando el siguiente `curl` desde tu terminal (reemplazando `TU_TOKEN` y `TU_URL`):
+2. **Sube tus cambios y despliega:**
    ```bash
-   curl -F "url=https://TU_URL/telegram" \
-        -F "secret_token=cambiame" \
-        https://api.telegram.org/botTU_TOKEN/setWebhook
+   git add .
+   git commit -m "Agregada integración con Telegram Webhook"
+   git push origin main
+   fly deploy  # O `git push heroku main` dependiendo de tu plataforma
    ```
-   *(Nota: Telegram enviará todos los mensajes del bot mediante POST al endpoint `/telegram` de la API)*
+
+3. **Registra el Webhook en Telegram:**
+   Una vez desplegado y teniendo tu URL pública, configura el archivo `.env` localmente añadiendo tu `PUBLIC_URL` y ejecuta los scripts:
+   ```bash
+   # Registra la URL en Telegram
+   python scripts/set_webhook.py
+   
+   # Confirma que se registró sin errores
+   python scripts/webhook_info.py
+   ```
+
+4. **Prueba el Bot:**
+   Abre Telegram, escríbele al bot los 6 mensajes de las pruebas (ej: "¿tienen la polera azul en talla M?") y revisa los logs de tu servidor para verificar las rutas:
+   ```bash
+   fly logs --tail  # o `heroku logs --tail`
+   ```
+
+5. **Troubleshooting (Qué revisar si el bot no responde):**
+   - Asegúrate de que tu webhook está apuntando a `https://TU_URL/telegram` (la API de Telegram exige **https**).
+   - Verifica en `scripts/webhook_info.py` que no haya errores de entrega (`last_error_message`).
+   - Confirma que `TELEGRAM_SECRET` sea idéntico en tu `.env` de producción y en la invocación de webhook.
+   - Valida que `TELEGRAM_TOKEN` sea el correcto (el que te dio BotFather).
