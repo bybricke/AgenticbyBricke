@@ -132,6 +132,23 @@ def chat_endpoint(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         )
 
 
+async def enviar_mensaje_directo_telegram(chat_id: int, texto: str):
+    """
+    Envía un mensaje directamente a Telegram sin pasar por el agente.
+    """
+    token = os.getenv("TELEGRAM_TOKEN")
+    if token:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": texto
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(url, json=payload)
+        except Exception as e:
+            logger.error(f"Error enviando mensaje directo a Telegram: {e}")
+
 async def procesar_mensaje_telegram(chat_id: int, texto: str):
     """
     Invoca el grafo y envía la respuesta a Telegram.
@@ -186,11 +203,21 @@ async def telegram_webhook(
         chat_id = message.get("chat", {}).get("id")
         texto = message.get("text")
 
-        # 3. Ignorar updates que no contengan texto (fotos, audios, etc. por ahora)
-        if chat_id and texto:
-            # Enviar el procesamiento a una tarea de fondo (Background Task)
-            # Esto permite devolver un 200 OK inmediatamente a Telegram
-            background_tasks.add_task(procesar_mensaje_telegram, chat_id, texto)
+        # 3. Detectar GIFs u otros tipos y procesar texto
+        if chat_id:
+            # Telegram suele enviar los GIFs como 'animation' o como un 'document' de tipo video/mp4
+            is_gif = "animation" in message or (
+                "document" in message and message["document"].get("mime_type") in ["image/gif", "video/mp4"]
+            )
+            
+            if is_gif:
+                mensaje_rechazo = "No entiendo los GIFs por ahora. Por favor, escríbeme o mándame un mensaje de voz."
+                background_tasks.add_task(enviar_mensaje_directo_telegram, chat_id, mensaje_rechazo)
+                logger.info(f"GIF rechazado para Chat: {chat_id}")
+            elif texto:
+                # Enviar el procesamiento a una tarea de fondo (Background Task)
+                # Esto permite devolver un 200 OK inmediatamente a Telegram
+                background_tasks.add_task(procesar_mensaje_telegram, chat_id, texto)
             
     except Exception as e:
         logger.error(f"Error parseando request de Telegram: {e}")
