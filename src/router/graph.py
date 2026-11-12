@@ -44,8 +44,14 @@ def router_node(state: AgentState):
     }
 
 def preventa_node(state: AgentState):
-    respuesta = PREVENTA_PROMPT.format(mensaje=state["mensaje"])
-    return {"respuesta": respuesta}
+    from src.preventa.graph import graph as preventa_graph
+    
+    # Le pasamos toda la historia de mensajes al sub-agente
+    resultado = preventa_graph.invoke({"messages": state["messages"]})
+    
+    # Extraemos el último mensaje generado por el sub-agente de preventa
+    respuesta_final = resultado["messages"][-1].content
+    return {"respuesta": respuesta_final}
 
 def postventa_node(state: AgentState):
     respuesta = POSTVENTA_PROMPT.format(mensaje=state["mensaje"])

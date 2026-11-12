@@ -36,6 +36,23 @@ Puedes probar el modelo router desde la consola directamente sin levantar la API
   python main.py router "mi pedido 4521 llegó roto" --saltos
   ```
 
+## Clave de la API
+
+El endpoint `/chat` está protegido. Para usarlo necesitas una clave secreta.
+
+1. **Cómo generar una:** Puedes usar cualquier texto difícil de adivinar. Por ejemplo, en tu terminal ejecuta `openssl rand -hex 32` o genera una contraseña segura.
+2. **En local:** Añádela en tu archivo `.env`:
+   ```bash
+   API_KEY="tu_clave_super_secreta"
+   ```
+3. **En Heroku / Fly.io:** Añádela como variable de entorno (Config Vars en el dashboard de Heroku, o mediante comando):
+   ```bash
+   heroku config:set API_KEY="tu_clave_super_secreta"
+   # o en Fly.io:
+   fly secrets set API_KEY="tu_clave_super_secreta"
+   ```
+Al hacer peticiones POST a `/chat`, envía esta clave en el header `X-API-Key`.
+
 ## Levantar la API Localmente
 
 Para iniciar la API en FastAPI con recarga automática para desarrollo:

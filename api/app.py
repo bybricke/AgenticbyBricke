@@ -1,7 +1,9 @@
 import os
 import logging
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Header, BackgroundTasks
+import secrets
+from fastapi import FastAPI, HTTPException, Request, Header, BackgroundTasks, Depends
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -65,6 +67,21 @@ class ChatResponse(BaseModel):
         examples=["Soy el agente de preventa. Recibí: ¿Tienen la polera azul en talla M?. Pronto podré ayudarte con productos y compras."]
     )
 
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False, description="Clave de acceso para usar la API.")
+
+def verify_api_key(api_key: str = Depends(api_key_header)):
+    expected_api_key = os.getenv("API_KEY")
+    if not expected_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="API_KEY no configurada en el servidor."
+        )
+    if not api_key or not secrets.compare_digest(api_key, expected_api_key):
+        raise HTTPException(
+            status_code=401,
+            detail="Falta la clave X-API-Key o es incorrecta."
+        )
+    return api_key
 
 @app.get("/health", tags=["salud"])
 def health_check():
@@ -81,11 +98,12 @@ def health_check():
     tags=["chat"],
     responses={
         200: {"description": "Mensaje procesado y enrutado exitosamente."},
+        401: {"description": "No autorizado. Falta X-API-Key o es inválida."},
         422: {"description": "Error de validación (body inválido o faltan campos)."},
         502: {"description": "Error interno al comunicarse con el modelo LLM (Bad Gateway)."}
     }
 )
-def chat_endpoint(request: ChatRequest):
+def chat_endpoint(request: ChatRequest, api_key: str = Depends(verify_api_key)):
     """
     Recibe un mensaje, lo envía al agente (router) manteniendo la memoria por `user_id`,
     y devuelve la ruta decidida, el motivo y la respuesta final del agente.
@@ -127,7 +145,7 @@ async def procesar_mensaje_telegram(chat_id: int, texto: str):
         # El thread_id es el chat_id de Telegram para mantener la memoria por usuario
         config = {"configurable": {"thread_id": str(chat_id)}}
         
-        result = graph.invoke(initial_state, config=config)
+        result = await graph.ainvoke(initial_state, config=config)
         respuesta = result.get("respuesta", "Lo siento, tuve un problema procesando tu mensaje.")
         ruta = result.get("ruta", "desconocida")
         logger.info(f"Telegram Enrutado -> Chat: {chat_id} | Ruta: {ruta} | Mensaje: {texto[:20]}")
