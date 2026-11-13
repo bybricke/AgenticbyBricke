@@ -30,6 +30,23 @@ class AgentState(TypedDict):
     respuesta: str
     messages: Annotated[list, add_messages]
 
+def extraer_texto(content):
+    """
+    Extrae el texto de la propiedad content devuelta por el LLM.
+    Gemini a menudo devuelve una lista de diccionarios: [{'type': 'text', 'text': '...'}]
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        partes = []
+        for parte in content:
+            if isinstance(parte, dict) and "text" in parte:
+                partes.append(parte["text"])
+            elif isinstance(parte, str):
+                partes.append(parte)
+        return "".join(partes) if partes else str(content)
+    return str(content)
+
 def router_node(state: AgentState):
     # Forzar salida estructurada según el modelo pydantic Decision
     router_llm = llm.with_structured_output(Decision)
@@ -53,7 +70,7 @@ def preventa_node(state: AgentState):
     resultado = preventa_graph.invoke({"messages": state["messages"]})
     
     # Extraemos el último mensaje generado por el sub-agente de preventa
-    respuesta_final = resultado["messages"][-1].content
+    respuesta_final = extraer_texto(resultado["messages"][-1].content)
     return {"respuesta": respuesta_final, "messages": [AIMessage(content=respuesta_final)]}
 
 def postventa_node(state: AgentState):
@@ -72,7 +89,7 @@ def generica_node(state: AgentState):
     
     try:
         resultado = llm.invoke(mensajes)
-        respuesta = resultado.content
+        respuesta = extraer_texto(resultado.content)
     except Exception as e:
         logger.error(f"Error en generica_node: {e}")
         respuesta = GENERICA_FALLBACK
