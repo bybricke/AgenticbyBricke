@@ -1,9 +1,17 @@
 import asyncio
-from src.router.graph import graph
+from langgraph.graph import StateGraph, START
+from langgraph.checkpoint.memory import AsyncMemorySaver
 
-async def main():
-    result = await graph.ainvoke({"mensaje": "hola", "messages": [("user", "hola")]}, {"configurable": {"thread_id": "test_async"}})
-    print("Async result:", result.get("ruta"))
+def node(state):
+    return state
 
-if __name__ == "__main__":
-    asyncio.run(main())
+graph = StateGraph(dict)
+graph.add_node("node", node)
+graph.add_edge(START, "node")
+memory = AsyncMemorySaver()
+app = graph.compile(checkpointer=memory)
+
+try:
+    app.invoke({"test": "value"}, {"configurable": {"thread_id": "1"}})
+except Exception as e:
+    print(f"Error calling invoke: {type(e).__name__}: {e}")

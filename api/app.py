@@ -2,19 +2,28 @@ import os
 import logging
 import httpx
 import secrets
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Header, BackgroundTasks, Depends
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-# Importar el grafo. Al estar a nivel de módulo, se compila una sola vez al arranque.
-from src.router.graph import graph
+# Importar el grafo y funciones de db
+import src.router.graph as router_graph
 
 load_dotenv()
 
 # Configuración básica de logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Abrir la base de datos y preparar las tablas
+    await router_graph.setup_db()
+    yield
+    # Cerrar el pool de conexiones al apagar
+    await router_graph.close_db()
 
 # Configuración Swagger (OpenAPI)
 description = """
@@ -34,7 +43,8 @@ app = FastAPI(
     title="Ecommerce Router API",
     version="1.0.0",
     description=description,
-    openapi_tags=tags_metadata
+    openapi_tags=tags_metadata,
+    lifespan=lifespan
 )
 
 # Modelos Pydantic de entrada y salida
@@ -89,7 +99,7 @@ def health_check():
     Retorna el estado de salud del servidor y el modelo configurado.
     """
     modelo = os.getenv("MODELO", "gemini-3.5-flash-lite")
-    return {"ok": True, "modelo": modelo}
+    return {"ok": True, "modelo": modelo, "memoria": router_graph.memory_type}
 
 
 @app.post(
@@ -103,7 +113,7 @@ def health_check():
         502: {"description": "Error interno al comunicarse con el modelo LLM (Bad Gateway)."}
     }
 )
-def chat_endpoint(request: ChatRequest, api_key: str = Depends(verify_api_key)):
+async def chat_endpoint(request: ChatRequest, api_key: str = Depends(verify_api_key)):
     """
     Recibe un mensaje, lo envía al agente (router) manteniendo la memoria por `user_id`,
     y devuelve la ruta decidida, el motivo y la respuesta final del agente.
@@ -115,8 +125,8 @@ def chat_endpoint(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         }
         config = {"configurable": {"thread_id": request.user_id}}
         
-        # Invocamos el grafo compilado
-        result = graph.invoke(initial_state, config=config)
+        # Invocamos el grafo compilado asincronamente
+        result = await router_graph.graph.ainvoke(initial_state, config=config)
         
         return ChatResponse(
             ruta=result.get("ruta", "desconocida"),
@@ -162,7 +172,7 @@ async def procesar_mensaje_telegram(chat_id: int, texto: str):
         # El thread_id es el chat_id de Telegram para mantener la memoria por usuario
         config = {"configurable": {"thread_id": str(chat_id)}}
         
-        result = await graph.ainvoke(initial_state, config=config)
+        result = await router_graph.graph.ainvoke(initial_state, config=config)
         respuesta = result.get("respuesta", "Lo siento, tuve un problema procesando tu mensaje.")
         ruta = result.get("ruta", "desconocida")
         logger.info(f"Telegram Enrutado -> Chat: {chat_id} | Ruta: {ruta} | Mensaje: {texto[:20]}")

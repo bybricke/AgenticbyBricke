@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "n8n": {
+        "url": "https://bricke.app.n8n.cloud/mcp-server/http"
+      }
+    }
+  }
+}

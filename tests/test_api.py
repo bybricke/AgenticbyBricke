@@ -18,11 +18,11 @@ def test_chat_with_api_key_returns_200(monkeypatch):
     if not api_key:
         pytest.skip("No API_KEY in env, skipping test")
 
-    def mock_invoke(*args, **kwargs):
+    async def mock_ainvoke(*args, **kwargs):
         return {"ruta": "preventa", "motivo": "test", "respuesta": "test ok"}
     
     # Parcheamos el grafo para que no llame al LLM real
-    monkeypatch.setattr("api.app.graph.invoke", mock_invoke)
+    monkeypatch.setattr("api.app.router_graph.graph.ainvoke", mock_ainvoke)
 
     response = client.post(
         "/chat",
